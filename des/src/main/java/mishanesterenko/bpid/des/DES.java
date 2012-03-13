@@ -92,14 +92,117 @@ public class DES {
         }
     }
 
-    private static BitSet e(final BitSet v) {
+    private static void applyPermutation(final BitSet v, final byte[] perm) {
+        BitSet newBitSet = new BitSet(perm.length);
+        for (int i = 0; i < perm.length; ++i) {
+            newBitSet.set(i, v.get(perm[i]));
+        }
+        v.xor(v);
+        v.or(newBitSet);
+    }
+
+    private static BitSet extend(final BitSet v) {
         if (v.size() != BLOCK_SIZE / 2) {
             throw new IllegalArgumentException("Wrong length: " + v.size());
         }
         BitSet extended = new BitSet(BLOCK_EXTENSION_SIZE);
-        for (int i = 0; i < BLOCK_EXTENSION_SIZE; ++ i) {
-            
+        for (int i = 0; i < BLOCK_EXTENSION_SIZE; ++i) {
+            extended.set(i, v.get(E[i]));
         }
         return extended;
+    }
+
+    private static BitSet shrink(final BitSet v) {
+        if (v.size() != BLOCK_EXTENSION_SIZE) {
+            throw new IllegalArgumentException("Wrong size: " + v.size());
+        }
+        BitSet newBitSet = new BitSet(BLOCK_SIZE / 2);
+
+        for (int i = 0; i < 8; ++i) {
+            BitSet row = new BitSet(2);
+            BitSet col = new BitSet(4);
+            BitSet part = new BitSet(6);
+            part.or(v.get(i * 6, (i + 1) * 6));
+
+            row.set(0, part.get(0)); row.set(1, part.get(5));
+            col.or(part.get(1, 5));
+
+            int colValue = col.toByteArray()[0];
+            int rowValue = row.toByteArray()[0];
+
+            {
+                BitSet bs = BitSet.valueOf(new byte[] {S[i][rowValue][colValue]});
+                for (int j = 0; j < 4; ++j) {
+                    newBitSet.set(4 * i + j, bs.get(j));
+                }
+            }
+        }
+        return newBitSet;
+    }
+
+    private void cycleShift(final BitSet key, final int shift) {
+        BitSet bs = new BitSet(key.size());
+        for (int i = 0; i < key.size(); ++i) {
+            bs.set((i + shift) % key.size(), key.get(i));
+        }
+        key.xor(key);
+        key.or(bs);
+    }
+
+    private void f(final BitSet v, final BitSet k) {
+        BitSet e = extend(v);
+        e.xor(k);
+        e = shrink(e);
+        copyBits(v, e, 0);
+    }
+
+    private void applyFeistel(final BitSet v, final BitSet key) {
+        if (v.size() != BLOCK_SIZE) {
+            throw new IllegalArgumentException("Wrong block size: " + v.size());
+        }
+        BitSet bs = new BitSet(v.size());
+        BitSet left = v.get(0, v.size() / 2);
+        BitSet right = v.get(v.size() / 2, v.size());
+
+        copyBits(bs, right, 0);
+        
+
+        v.xor(v);
+        v.or(bs);
+    }
+
+    private void copyBits(final BitSet to, final BitSet from, final int startIndex) {
+        for (int i = 0; i < from.size(); ++i) {
+            to.set(startIndex + i, from.get(i));
+        }
+    }
+
+    /**
+     * Crypts arrays of bytes with the specified key.
+     * @param data size must be multiple of 2 bytes
+     * @param key must be 8 bytes
+     * @return
+     */
+    public static byte[] crypt(final byte[] data, byte[] key) {
+        if (data.length % 2 != 0) {
+            throw new IllegalArgumentException("Wrong data size");
+        }
+        if (key.length != 8) {
+            throw new IllegalArgumentException("Key size must be 8, not " + key.length);
+        }
+
+        BitSet keyBits = BitSet.valueOf(key);
+        for (int i = 0; i <= 64; i+= 8) {
+            keyBits.set(i, keyBits.get(i, i + 7).cardinality() % 2 == 0);
+        }
+
+        BitSet dataBits = BitSet.valueOf(data);
+        for (int i = 0; i < dataBits.length(); i += BLOCK_SIZE) {
+            BitSet block = dataBits.get(i, i + BLOCK_SIZE);
+            applyPermutation(block, IP);
+            
+        }
+        
+        return null;
     }
 }
