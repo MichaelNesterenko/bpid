@@ -12,7 +12,11 @@ import java.util.List;
 public class DES {
     private static final int BLOCK_SIZE = 64;
 
-    private static final int BLOCK_EXTENSION_SIZE = 48;
+    private static final int EFFECTIVE_KEY_SIZE = 56;
+
+    private static final int ROUND_KEY_SIZE = 48;
+
+    private static final int BLOCK_EXTENSION_SIZE = ROUND_KEY_SIZE;
 
     private static final int CYPHER_TABLE_ROW_COUNT = 8;
 
@@ -20,12 +24,11 @@ public class DES {
 
     private static final int CYPHER_TABLE_BLOCK_SIZE = 4;
 
-    private static final byte[] IP = new byte[] { 58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4, 62, 54, 46, 38, 30,
-            22, 14, 6, 64, 56, 48, 40, 32, 24, 16, 8, 57, 49, 41, 33, 25, 17, 9, 1, 59, 51, 43, 35, 27, 19, 11, 3, 61, 53, 45, 37,
-            29, 21, 13, 5, 63, 55, 47, 39, 31, 23, 15, 7 };
+    private static final byte[] IP = new byte[] { 57, 49, 41, 33, 25, 17, 9, 1, 59, 51, 43, 35, 27, 19, 11, 3, 61, 53, 45, 37, 29,
+            21, 13, 5, 63, 55, 47, 39, 31, 23, 15, 7, 56, 48, 40, 32, 24, 16, 8, 0, 58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36,
+            28, 20, 12, 4, 62, 54, 46, 38, 30, 22, 14, 6 };
 
-    private static final byte[] E = new byte[] { 32, 1, 2, 3, 4, 5, 4, 5, 6, 7, 8, 9, 8, 9, 10, 11, 12, 13, 12, 13, 14, 15, 16, 17,
-            16, 17, 18, 19, 20, 21, 20, 21, 22, 23, 24, 25, 24, 25, 26, 27, 28, 29, 28, 29, 30, 31, 32, 1 };
+    private static final byte[] E = new byte[] { 31, 0, 1, 2, 3, 4, 3, 4, 5, 6, 7, 8, 7, 8, 9, 10, 11, 12, 11, 12, 13, 14, 15, 16, 15, 16, 17, 18, 19, 20, 19, 20, 21, 22, 23, 24, 23, 24, 25, 26, 27, 28, 27, 28, 29, 30, 31, 0, };
 
     private static final byte[][][] S = new byte[][][] {
             new byte[][] { new byte[] { 14, 4, 13, 1, 2, 5, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7 },
@@ -61,25 +64,17 @@ public class DES {
                     new byte[] { 7, 11, 4, 1, 9, 12, 14, 2, 0, 6, 10, 13, 15, 3, 5, 8 },
                     new byte[] { 2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11 } }, };
 
-    private static final byte[] P = new byte[] { 16, 7, 20, 21, 29, 12, 28, 17, 1, 15, 23, 26, 5, 18, 31, 10, 2, 8, 24, 14, 32, 27,
-            3, 9, 19, 13, 30, 6, 22, 11, 4, 25 };
+    private static final byte[] P = new byte[] {15, 6, 19, 20, 28, 11, 27, 16, 0, 14, 22, 25, 4, 17, 30, 9, 1, 7, 23, 13, 31, 26, 2, 8, 18, 12, 29, 5, 21, 10, 3, 24, };
 
-    private static final byte[] C0 = new byte[] { 57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18, 10, 2, 59, 51, 43, 35, 27,
-            19, 11, 3, 60, 52, 44, 36 };
+    private static final byte[] C0 = new byte[] {56, 48, 40, 32, 24, 16, 8, 0, 57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18, 10, 2, 59, 51, 43, 35, };
 
-    private static final byte[] D0 = new byte[] { 63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 22, 14, 6, 61, 53, 45, 37, 29,
-            21, 13, 5, 28, 20, 12, 4 };
+    private static final byte[] D0 = new byte[] {62, 54, 46, 38, 30, 22, 14, 6, 61, 53, 45, 37, 29, 21, 13, 5, 60, 52, 44, 36, 28, 20, 12, 4, 27, 19, 11, 3, };
 
-    private static final byte[] CYCLIC_SHIFT_COUNT = new byte[] {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
+    private static final byte[] CYCLIC_SHIFT_COUNT = new byte[] { -1, -1, -2, -2, -2, -2, -2, -2, -1, -2, -2, -2, -2, -2, -2, -1 };
 
-    private static final byte[] ROUND_KEY_PERMUTATION = new byte[] {14, 17, 11, 24, 1, 5, 3, 28, 15, 6, 21, 10, 23, 19, 12, 4,
-        26, 8, 16, 7, 27, 20, 13, 2, 41, 52, 31, 37, 47, 55, 30, 40,
-        51, 45, 33, 48, 44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32};
+    private static final byte[] ROUND_KEY_PERMUTATION = new byte[] {13, 16, 10, 23, 0, 4, 2, 27, 14, 5, 20, 9, 22, 18, 11, 3, 25, 7, 15, 6, 26, 19, 12, 1, 40, 51, 30, 36, 46, 54, 29, 39, 50, 44, 32, 47, 43, 48, 38, 55, 33, 52, 45, 41, 49, 35, 28, 31, };
 
-    private static final byte[] EP = new byte[] {40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31,
-        38, 6, 46, 14, 54, 22, 62, 30, 37, 5, 45, 13, 53, 21, 61, 29,
-        36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27,
-        34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25};
+    private static final byte[] EP = new byte[] {39, 7, 47, 15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22, 62, 30, 37, 5, 45, 13, 53, 21, 61, 29, 36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27, 34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25, 32, 0, 40, 8, 48, 16, 56, 24, };
 
     private static final byte[] DECRYPT_PERMUTATION = new byte[BLOCK_SIZE];
 
@@ -111,9 +106,6 @@ public class DES {
     }
 
     private static BitSet extend(final BitSet v) {
-        if (v.size() != BLOCK_SIZE / 2) {
-            throw new IllegalArgumentException("Wrong length: " + v.size());
-        }
         BitSet extended = new BitSet(BLOCK_EXTENSION_SIZE);
         for (int i = 0; i < BLOCK_EXTENSION_SIZE; ++i) {
             extended.set(i, v.get(E[i]));
@@ -122,9 +114,6 @@ public class DES {
     }
 
     private static BitSet shrink(final BitSet v) {
-        if (v.size() != BLOCK_EXTENSION_SIZE) {
-            throw new IllegalArgumentException("Wrong size: " + v.size());
-        }
         BitSet newBitSet = new BitSet(BLOCK_SIZE / 2);
 
         for (int i = 0; i < 8; ++i) {
@@ -133,14 +122,15 @@ public class DES {
             BitSet part = new BitSet(6);
             part.or(v.get(i * 6, (i + 1) * 6));
 
-            row.set(0, part.get(0)); row.set(1, part.get(5));
+            row.set(0, part.get(0));
+            row.set(1, part.get(5));
             col.or(part.get(1, 5));
 
-            int colValue = col.toByteArray()[0];
-            int rowValue = row.toByteArray()[0];
+            int colValue = col.toByteArray().length == 0 ? 0 : col.toByteArray()[0];
+            int rowValue = row.toByteArray().length == 0 ? 0 : row.toByteArray()[0];
 
             {
-                BitSet bs = BitSet.valueOf(new byte[] {S[i][rowValue][colValue]});
+                BitSet bs = BitSet.valueOf(new byte[] { S[i][rowValue][colValue] });
                 for (int j = 0; j < 4; ++j) {
                     newBitSet.set(4 * i + j, bs.get(j));
                 }
@@ -149,10 +139,10 @@ public class DES {
         return newBitSet;
     }
 
-    private static void cycleShift(final BitSet key, final int shift) {
-        BitSet bs = new BitSet(key.size());
-        for (int i = 0; i < key.size(); ++i) {
-            bs.set((i + shift) % key.size(), key.get(i));
+    private static void cycleShift(final BitSet key, final int shift, final int size) {
+        BitSet bs = new BitSet(size);
+        for (int i = 0; i < size; ++i) {
+            bs.set((i + shift + size) % size, key.get(i));
         }
         key.xor(key);
         key.or(bs);
@@ -162,38 +152,37 @@ public class DES {
         BitSet e = extend(v);
         e.xor(k);
         e = shrink(e);
+        e = applyPermutation(e, P);
         return e;
     }
 
     private static void applyFeistel(final BitSet v, final BitSet key) {
-        if (v.size() != BLOCK_SIZE) {
-            throw new IllegalArgumentException("Wrong block size: " + v.size());
-        }
-        BitSet bs = new BitSet(v.size());
-        BitSet left = v.get(0, v.size() / 2);
-        BitSet right = v.get(v.size() / 2, v.size());
+        BitSet bs = new BitSet(BLOCK_SIZE);
+        BitSet left = v.get(0, BLOCK_SIZE / 2);
+        BitSet right = v.get(BLOCK_SIZE / 2, BLOCK_SIZE);
 
-        copyBits(bs, right, 0);
+        copyBits(bs, right, 0, 0, BLOCK_SIZE / 2);
         left.xor(f(right, key));
-        copyBits(bs, left, v.size() / 2);
+        copyBits(bs, left, BLOCK_SIZE / 2, 0, BLOCK_SIZE / 2);
 
-        copyBits(v, bs, 0);
+        copyBits(v, bs, 0, 0, BLOCK_SIZE);
     }
 
-    private static void copyBits(final BitSet to, final BitSet from, final int startIndex) {
-        for (int i = 0; i < from.size(); ++i) {
-            to.set(startIndex + i, from.get(i));
+    private static void copyBits(final BitSet to, final BitSet from, final int dstStartIndex, final int srcStartIndex,
+            final int count) {
+        for (int i = 0; i < count; ++i) {
+            to.set(dstStartIndex + i, from.get(i + srcStartIndex));
         }
     }
 
     private static void prepareKey(final BitSet key) {
-        for (int i = 0; i <= 64; i+= 8) {
+        for (int i = 7; i < 64; i += 8) {
             key.set(i, key.get(i, i + 7).cardinality() % 2 == 0);
         }
     }
 
     private static void mayDesWork(final byte[] data, byte[] key) {
-        if (data.length % 2 != 0) {
+        if (data.length * 8 % BLOCK_SIZE != 0 || data.length * 8 < BLOCK_SIZE) {
             throw new IllegalArgumentException("Wrong data size");
         }
         if (key.length != 8) {
@@ -202,25 +191,29 @@ public class DES {
     }
 
     private static void fillCacheWithKeys(final List<BitSet> cache, final BitSet c, final BitSet d) {
-        BitSet roundKey = new BitSet(48);
+        BitSet roundKey = new BitSet(ROUND_KEY_SIZE);
         BitSet cCopy = new BitSet(c.size());
         BitSet dCopy = new BitSet(d.size());
 
-        copyBits(cCopy, c, 0);
-        copyBits(dCopy, d, 0);
+        copyBits(cCopy, c, 0, 0, c.size());
+        copyBits(dCopy, d, 0, 0, c.size());
         for (int i = 0; i < 16; ++i) {
-            cycleShift(c, CYCLIC_SHIFT_COUNT[i]);
-            cycleShift(d, CYCLIC_SHIFT_COUNT[i]);
-            copyBits(roundKey, c, 0);
-            copyBits(roundKey, d, c.size());
+            cycleShift(c, CYCLIC_SHIFT_COUNT[i], EFFECTIVE_KEY_SIZE / 2);
+            cycleShift(d, CYCLIC_SHIFT_COUNT[i], EFFECTIVE_KEY_SIZE / 2);
+            copyBits(roundKey, c, 0, 0, c.size());
+            copyBits(roundKey, d, BLOCK_SIZE / 2, 0, BLOCK_SIZE / 2);
+            roundKey = applyPermutation(roundKey, ROUND_KEY_PERMUTATION);
             cache.add(roundKey);
         }
     }
 
     /**
      * Crypts arrays of bytes with the specified key.
-     * @param data size must be multiple of 2 bytes
-     * @param key must be 8 bytes
+     * 
+     * @param data
+     *            size must be multiple of 2 bytes
+     * @param key
+     *            must be 8 bytes
      * @return
      */
     public static byte[] crypt(final byte[] data, byte[] key) {
@@ -231,28 +224,21 @@ public class DES {
         BitSet c = applyPermutation(keyBits, C0);
         BitSet d = applyPermutation(keyBits, D0);
 
-        byte[] copyData = new byte[data.length + 2];
-        copyData[0] = copyData[copyData.length - 1] = -128;
-        System.arraycopy(data, 0, copyData, 1, data.length);
-
-        BitSet dataBits = BitSet.valueOf(copyData);
-        dataBits = dataBits.get(8, dataBits.size() - 8);
-        copyData = null;
-        System.out.println(dataBits.size());
-
+        BitSet dataBits = BitSet.valueOf(data);
         List<BitSet> cachedKeys = new ArrayList<BitSet>(16);
         fillCacheWithKeys(cachedKeys, c, d);
-        for (int i = 0; i < dataBits.length(); i += BLOCK_SIZE) {
+        for (int i = 0; i < data.length * 8; i += BLOCK_SIZE) {
             BitSet block = dataBits.get(i, i + BLOCK_SIZE);
-            applyPermutation(block, IP);
+            block = applyPermutation(block, IP);
             for (int j = 0; j < 16; ++j) {
-                keyBits = applyPermutation(cachedKeys.get(j), ROUND_KEY_PERMUTATION);
-                applyFeistel(block, keyBits);
+                applyFeistel(block, cachedKeys.get(j));
+                System.out.println(block);
             }
-            applyPermutation(block, EP);
-            copyBits(dataBits, block, i);
+            block = applyPermutation(block, EP);
+            System.out.println("EP:" + block);
+            copyBits(dataBits, block, i, 0, BLOCK_SIZE);
         }
-        
+
         return dataBits.toByteArray();
     }
 
@@ -270,16 +256,24 @@ public class DES {
         BitSet dataBits = BitSet.valueOf(data);
         for (int i = 0; i < dataBits.length(); i += BLOCK_SIZE) {
             BitSet block = dataBits.get(i, i + BLOCK_SIZE);
-            applyPermutation(block, DECRYPT_PERMUTATION);
-            applyPermutation(block, EP);
-            for (int j = 16; j >= 0; --j) {
-                keyBits = applyPermutation(cachedKeys.get(j), ROUND_KEY_PERMUTATION);
-                applyFeistel(block, keyBits);
+            block = applyPermutation(block, EP);
+            System.out.println("\t" + block);
+            block = applyPermutation(block, DECRYPT_PERMUTATION);
+            for (int j = 15; j >= 0; --j) {
+                applyFeistel(block, cachedKeys.get(j));
+                System.out.println("\t" + block);
             }
-            applyPermutation(block, IP);
-            copyBits(dataBits, block, i);
+            block = applyPermutation(block, IP);
+            copyBits(dataBits, block, i, 0, BLOCK_SIZE);
         }
-        
+
         return dataBits.toByteArray();
     }
+
+//    public static void main(String[] args) {
+//        byte[] arr = EP;
+//        for (int i = 0; i < arr.length; ++i) {
+//            System.out.print(arr[i] - 1 + ", ");
+//        }
+//    }
 }
