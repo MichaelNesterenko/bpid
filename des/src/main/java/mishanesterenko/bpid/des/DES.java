@@ -1,6 +1,9 @@
 package mishanesterenko.bpid.des;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
+import java.util.List;
 
 /**
  * @author Michael Nesterenko
@@ -78,6 +81,8 @@ public class DES {
         36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27,
         34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25};
 
+    private static final byte[] DECRYPT_PERMUTATION = new byte[BLOCK_SIZE];
+
     static {
         assert IP.length == BLOCK_SIZE;
         assert EP.length == BLOCK_SIZE;
@@ -90,15 +95,19 @@ public class DES {
                 assert eachOfEach.length == CYPHER_TABLE_ROW_SIZE;
             }
         }
+
+        for (int i = 0; i < DECRYPT_PERMUTATION.length / 2; ++i) {
+            DECRYPT_PERMUTATION[i] = (byte) (i + DECRYPT_PERMUTATION.length / 2);
+            DECRYPT_PERMUTATION[i + DECRYPT_PERMUTATION.length / 2] = (byte) i;
+        }
     }
 
-    private static void applyPermutation(final BitSet v, final byte[] perm) {
+    private static BitSet applyPermutation(final BitSet v, final byte[] perm) {
         BitSet newBitSet = new BitSet(perm.length);
         for (int i = 0; i < perm.length; ++i) {
             newBitSet.set(i, v.get(perm[i]));
         }
-        v.xor(v);
-        v.or(newBitSet);
+        return newBitSet;
     }
 
     private static BitSet extend(final BitSet v) {
@@ -140,7 +149,7 @@ public class DES {
         return newBitSet;
     }
 
-    private void cycleShift(final BitSet key, final int shift) {
+    private static void cycleShift(final BitSet key, final int shift) {
         BitSet bs = new BitSet(key.size());
         for (int i = 0; i < key.size(); ++i) {
             bs.set((i + shift) % key.size(), key.get(i));
@@ -149,14 +158,14 @@ public class DES {
         key.or(bs);
     }
 
-    private void f(final BitSet v, final BitSet k) {
+    private static BitSet f(final BitSet v, final BitSet k) {
         BitSet e = extend(v);
         e.xor(k);
         e = shrink(e);
-        copyBits(v, e, 0);
+        return e;
     }
 
-    private void applyFeistel(final BitSet v, final BitSet key) {
+    private static void applyFeistel(final BitSet v, final BitSet key) {
         if (v.size() != BLOCK_SIZE) {
             throw new IllegalArgumentException("Wrong block size: " + v.size());
         }
@@ -165,15 +174,46 @@ public class DES {
         BitSet right = v.get(v.size() / 2, v.size());
 
         copyBits(bs, right, 0);
-        
+        left.xor(f(right, key));
+        copyBits(bs, left, v.size() / 2);
 
-        v.xor(v);
-        v.or(bs);
+        copyBits(v, bs, 0);
     }
 
-    private void copyBits(final BitSet to, final BitSet from, final int startIndex) {
+    private static void copyBits(final BitSet to, final BitSet from, final int startIndex) {
         for (int i = 0; i < from.size(); ++i) {
             to.set(startIndex + i, from.get(i));
+        }
+    }
+
+    private static void prepareKey(final BitSet key) {
+        for (int i = 0; i <= 64; i+= 8) {
+            key.set(i, key.get(i, i + 7).cardinality() % 2 == 0);
+        }
+    }
+
+    private static void mayDesWork(final byte[] data, byte[] key) {
+        if (data.length % 2 != 0) {
+            throw new IllegalArgumentException("Wrong data size");
+        }
+        if (key.length != 8) {
+            throw new IllegalArgumentException("Key size must be 8, not " + key.length);
+        }
+    }
+
+    private static void fillCacheWithKeys(final List<BitSet> cache, final BitSet c, final BitSet d) {
+        BitSet roundKey = new BitSet(48);
+        BitSet cCopy = new BitSet(c.size());
+        BitSet dCopy = new BitSet(d.size());
+
+        copyBits(cCopy, c, 0);
+        copyBits(dCopy, d, 0);
+        for (int i = 0; i < 16; ++i) {
+            cycleShift(c, CYCLIC_SHIFT_COUNT[i]);
+            cycleShift(d, CYCLIC_SHIFT_COUNT[i]);
+            copyBits(roundKey, c, 0);
+            copyBits(roundKey, d, c.size());
+            cache.add(roundKey);
         }
     }
 
@@ -184,25 +224,62 @@ public class DES {
      * @return
      */
     public static byte[] crypt(final byte[] data, byte[] key) {
-        if (data.length % 2 != 0) {
-            throw new IllegalArgumentException("Wrong data size");
-        }
-        if (key.length != 8) {
-            throw new IllegalArgumentException("Key size must be 8, not " + key.length);
-        }
+        mayDesWork(data, key);
 
         BitSet keyBits = BitSet.valueOf(key);
-        for (int i = 0; i <= 64; i+= 8) {
-            keyBits.set(i, keyBits.get(i, i + 7).cardinality() % 2 == 0);
+        prepareKey(keyBits);
+        BitSet c = applyPermutation(keyBits, C0);
+        BitSet d = applyPermutation(keyBits, D0);
+
+        byte[] copyData = new byte[data.length + 2];
+        copyData[0] = copyData[copyData.length - 1] = -128;
+        System.arraycopy(data, 0, copyData, 1, data.length);
+
+        BitSet dataBits = BitSet.valueOf(copyData);
+        dataBits = dataBits.get(8, dataBits.size() - 8);
+        copyData = null;
+        System.out.println(dataBits.size());
+
+        List<BitSet> cachedKeys = new ArrayList<BitSet>(16);
+        fillCacheWithKeys(cachedKeys, c, d);
+        for (int i = 0; i < dataBits.length(); i += BLOCK_SIZE) {
+            BitSet block = dataBits.get(i, i + BLOCK_SIZE);
+            applyPermutation(block, IP);
+            for (int j = 0; j < 16; ++j) {
+                keyBits = applyPermutation(cachedKeys.get(j), ROUND_KEY_PERMUTATION);
+                applyFeistel(block, keyBits);
+            }
+            applyPermutation(block, EP);
+            copyBits(dataBits, block, i);
         }
+        
+        return dataBits.toByteArray();
+    }
+
+    public static byte[] decrypt(final byte[] data, final byte[] key) {
+        mayDesWork(data, key);
+
+        BitSet keyBits = BitSet.valueOf(key);
+        prepareKey(keyBits);
+        BitSet c = applyPermutation(keyBits, C0);
+        BitSet d = applyPermutation(keyBits, D0);
+
+        List<BitSet> cachedKeys = new ArrayList<BitSet>(16);
+        fillCacheWithKeys(cachedKeys, c, d);
 
         BitSet dataBits = BitSet.valueOf(data);
         for (int i = 0; i < dataBits.length(); i += BLOCK_SIZE) {
             BitSet block = dataBits.get(i, i + BLOCK_SIZE);
+            applyPermutation(block, DECRYPT_PERMUTATION);
+            applyPermutation(block, EP);
+            for (int j = 16; j >= 0; --j) {
+                keyBits = applyPermutation(cachedKeys.get(j), ROUND_KEY_PERMUTATION);
+                applyFeistel(block, keyBits);
+            }
             applyPermutation(block, IP);
-            
+            copyBits(dataBits, block, i);
         }
         
-        return null;
+        return dataBits.toByteArray();
     }
 }
