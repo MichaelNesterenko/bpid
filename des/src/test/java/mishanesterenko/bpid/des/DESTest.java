@@ -18,7 +18,7 @@ public class DESTest {
         Random r = new Random();
         byte[] key = {-1, -1, -1, -1, -1, -1, -1, -1};
 
-        for (int i = 0; i < 10000000; ++i) {
+        for (int i = 0; i < 1000; ++i) {
             byte[] srcData = new byte[8 * (r.nextInt(100) + 1)];
             byte[] data = new byte[srcData.length];
 
