@@ -13,11 +13,12 @@ import org.junit.Test;
 public class DESTest {
     @Test
     public void testCrypt() throws UnsupportedEncodingException {
-        byte[] data = new byte[] {0, 0, 0, 0, 0, 0, 0, 0};
+        byte[] srcData = new byte[] {0, 1, 0, 0, 0, 0, 0, 0};
+        byte[] data = new byte[srcData.length]; System.arraycopy(srcData, 0, data, 0, srcData.length);
         byte[] key = {-1, -1, -1, -1, -1, -1, -1, -1};
-        byte[] cryptedData = DES.crypt(data, key);
-        byte[] decryptedData = DES.decrypt(cryptedData, key);
+        DES.crypt(data, key);
+        DES.decrypt(data, key);
 
-        assertArrayEquals(data, decryptedData);
+        assertArrayEquals(srcData, data);
     }
 }

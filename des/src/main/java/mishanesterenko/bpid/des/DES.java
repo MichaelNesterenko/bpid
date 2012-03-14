@@ -1,7 +1,6 @@
 package mishanesterenko.bpid.des;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
@@ -207,40 +206,7 @@ public class DES {
         }
     }
 
-    /**
-     * Crypts arrays of bytes with the specified key.
-     * 
-     * @param data
-     *            size must be multiple of 2 bytes
-     * @param key
-     *            must be 8 bytes
-     * @return
-     */
-    public static byte[] crypt(final byte[] data, byte[] key) {
-        mayDesWork(data, key);
-
-        BitSet keyBits = BitSet.valueOf(key);
-        prepareKey(keyBits);
-        BitSet c = applyPermutation(keyBits, C0);
-        BitSet d = applyPermutation(keyBits, D0);
-
-        BitSet dataBits = BitSet.valueOf(data);
-        List<BitSet> cachedKeys = new ArrayList<BitSet>(16);
-        fillCacheWithKeys(cachedKeys, c, d);
-        for (int i = 0; i < data.length * 8; i += BLOCK_SIZE) {
-            BitSet block = dataBits.get(i, i + BLOCK_SIZE);
-            block = applyPermutation(block, IP);
-            for (int j = 0; j < 16; ++j) {
-                applyFeistel(block, cachedKeys.get(j));
-            }
-            block = applyPermutation(block, EP);
-            copyBits(dataBits, block, i, 0, BLOCK_SIZE);
-        }
-
-        return dataBits.toByteArray();
-    }
-
-    public static byte[] decrypt(final byte[] data, final byte[] key) {
+    private static void performTransformations(final byte[] data, byte[] key, final boolean crypt) {
         mayDesWork(data, key);
 
         BitSet keyBits = BitSet.valueOf(key);
@@ -253,18 +219,44 @@ public class DES {
 
         BitSet dataBits = BitSet.valueOf(data);
         for (int i = 0; i < dataBits.length(); i += BLOCK_SIZE) {
+            for (int j = i; j < i + BLOCK_SIZE; j += 8) {
+                data[j / 8] = 0;
+            }
             BitSet block = dataBits.get(i, i + BLOCK_SIZE);
             block = applyPermutation(block, IP);
-            block = applyPermutation(block, DECRYPT_PERMUTATION);
-            for (int j = 15; j >= 0; --j) {
-                applyFeistel(block, cachedKeys.get(j));
+            if (crypt) {
+                for (int j = 0; j < 16; ++j) {
+                    applyFeistel(block, cachedKeys.get(j));
+                }
+            } else {
+                block = applyPermutation(block, DECRYPT_PERMUTATION);
+                for (int j = 15; j >= 0; --j) {
+                    applyFeistel(block, cachedKeys.get(j));
+                }
+                block = applyPermutation(block, DECRYPT_PERMUTATION);
             }
-            block = applyPermutation(block, DECRYPT_PERMUTATION);
             block = applyPermutation(block, EP);
-            copyBits(dataBits, block, i, 0, BLOCK_SIZE);
+            for (int j = 0; j < BLOCK_SIZE; ++j) {
+                data[(i + j) / 8] |= 1 >> ((i + j) % 8);
+            }
         }
+    }
 
-        return dataBits.toByteArray();
+    /**
+     * Crypts arrays of bytes with the specified key.
+     * 
+     * @param data
+     *            size must be multiple of 2 bytes
+     * @param key
+     *            must be 8 bytes
+     * @return
+     */
+    public static void crypt(final byte[] data, byte[] key) {
+        performTransformations(data, key, true);
+    }
+
+    public static void decrypt(final byte[] data, final byte[] key) {
+        performTransformations(data, key, false);
     }
 
     private static String toStringBitSet(final BitSet v, final int len) {
