@@ -259,12 +259,20 @@ public class DES {
         performTransformations(data, key, false);
     }
 
-    private static String toStringBitSet(final BitSet v, final int len) {
-        StringBuilder sb = new StringBuilder(len);
-        for (int i = 0; i < len; ++i) {
-            sb.append(v.get(i) ? "1" : "0");
+    public static boolean isWeak(byte[] key) {
+        List<BitSet> keys = new ArrayList<BitSet>();
+        BitSet keyBits = BitSet.valueOf(key);
+        prepareKey(keyBits);
+        BitSet c = applyPermutation(keyBits, C0);
+        BitSet d = applyPermutation(keyBits, D0);
+        fillCacheWithKeys(keys, c, d);
+        boolean allEqual = true;
+        for (int i = 1; i < keys.size(); ++i) {
+            if (!(allEqual = keys.get(i).equals(keys.get(i - 1)))) {
+                break;
+            }
         }
-        return sb.toString();
+        return allEqual;
     }
 
 }
