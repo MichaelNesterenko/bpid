@@ -237,7 +237,7 @@ public class DES {
             }
             block = applyPermutation(block, EP);
             for (int j = 0; j < BLOCK_SIZE; ++j) {
-                data[(i + j) / 8] |= 1 >> ((i + j) % 8);
+                data[(i + j) / 8] |= (block.get(j) ? 1 : 0) << ((i + j) % 8);
             }
         }
     }
