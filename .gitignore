@@ -4,3 +4,4 @@ target
 !.gitignore
 *.patch
 *.sh
+*.jpage
