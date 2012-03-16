@@ -3,6 +3,7 @@ package mishanesterenko.bpid.rsa;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.util.Random;
 
@@ -25,21 +26,8 @@ public class Rsa {
     }
 
     public static boolean isPrime(final BigInteger num) {
-        BigInteger cv = pingalaHanduPowerMod(TWO, num.add(BigInteger.ONE.negate()), num);
-
+        BigInteger cv = TWO.modPow(num.subtract(BigInteger.ONE), num);
         return BigInteger.ONE.equals(cv);
-    }
-
-    public static BigInteger pingalaHanduPowerMod(final BigInteger base, final BigInteger deg, final BigInteger mod) {
-        BigInteger cv = base;
-        for (int i = deg.bitLength() - 2; i >= 0; --i) {
-            boolean op = deg.testBit(i);
-            cv = cv.multiply(cv);
-            cv = mod != null ? cv.mod(mod) : cv;
-            cv = op ? (mod != null ? cv.multiply(base).mod(mod) : cv.multiply(base)) : cv;
-        }
-
-        return cv;
     }
 
     public static BigInteger generatePublicKey(final BigInteger p, final BigInteger q) {
@@ -55,41 +43,65 @@ public class Rsa {
 
     public static BigInteger generatePrivateKey(final BigInteger e, final BigInteger p, final BigInteger q) {
         BigInteger phi = p.subtract(BigInteger.ONE).multiply(q.subtract(BigInteger.ONE));
-        for (long k = 1; k < Long.MAX_VALUE; ++k) {
-            BigInteger up = BigInteger.ONE.add(BigInteger.valueOf(1).multiply(phi));
-            BigInteger rem = up.mod(e);
-            if (rem.equals(BigInteger.ZERO)) {
-                return up.divide(e);
-            }
-        }
-        throw new IllegalStateException("Can not create private key.");
+        BigInteger res = e.modInverse(phi);
+        return res;
+//        for (long k = 1; k < Long.MAX_VALUE; ++k) {
+//            BigInteger up = BigInteger.ONE.add(BigInteger.valueOf(k).multiply(phi));
+//            BigInteger rem = up.mod(e);
+//            if (rem.equals(BigInteger.ZERO)) {
+//                return up.divide(e);
+//            }
+//        }
+//        throw new IllegalStateException("Can not create private key.");
     }
 
     private static void mayRsaWork(final byte[] data, final BigInteger n) {
         int bitLength = n.bitLength();
-        if ((data.length * 8) % ((bitLength / 8) * 8) != 0) {
+        if ((data.length * 8) % bitLength != 0) {
             throw new IllegalArgumentException("Data size (" + data.length * 8 + ") is not multiple of key length (" + bitLength + " )");
         }
     }
 
-    public static void crypt(final byte[] data, final BigInteger e, final BigInteger n) {
+    public static void crypt(final byte[] data, final BigInteger e, final BigInteger n, final OutputStream res) throws IOException {
         mayRsaWork(data, n);
 
-        int blockSize = n.bitLength() / 8;
+        int blockSize = n.bitLength() / 8 / 2; blockSize = blockSize == 0 ? 1 : blockSize;
         int dataSize = data.length;
         byte[] blockData = new byte[blockSize];
         for (int i = 0; i < dataSize; i += blockSize) {
             System.arraycopy(data, i, blockData, 0, blockSize);
             BigInteger block = new BigInteger(1, blockData);
-            block = pingalaHanduPowerMod(block, e, n);
-            byte[] cryptedData = block.toByteArray();
-            System.arraycopy(cryptedData, 0, data, i, blockSize);
+            block = block.modPow(e, n);
+            byte[] cryptedData = toArrayBigInteger(block, n.bitLength());
+            res.write(cryptedData);
         }
     }
 
-    public static void decrypt(final byte[] data, final BigInteger d, final BigInteger n) {
+    private static byte[] toArrayBigInteger(final BigInteger bi, int bitLength) {
+        bitLength += bitLength % 8;
+        byte[] res = new byte[bitLength / 8];
+
+        for (int i = 0; i < Math.min(bi.bitLength(), bitLength); ++i) {
+            res[res.length - 1 - i / 8] |= (bi.testBit(i) ? 1 : 0) << (i % 8);
+        }
+        return res;
+    }
+
+    public static void decrypt(final byte[] data, final BigInteger d, final BigInteger n, final OutputStream res)
+            throws IOException {
         mayRsaWork(data, n);
-        crypt(data, d, n);
+
+        int decryptBlockSize = n.bitLength() / 8; decryptBlockSize = decryptBlockSize == 0 ? 1 : decryptBlockSize;
+        int resBlockSize = n.bitLength() / 2; resBlockSize = resBlockSize == 0 ? n.bitLength() : resBlockSize;
+        int dataSize = data.length;
+        byte[] blockData = new byte[decryptBlockSize];
+        for (int i = 0; i < dataSize; i += decryptBlockSize) {
+            System.arraycopy(data, i, blockData, 0, decryptBlockSize);
+            BigInteger block = new BigInteger(1, blockData);
+            block = block.modPow(d, n);
+            byte[] cryptedData = toArrayBigInteger(block, resBlockSize);
+            res.write(cryptedData);
+        }
     }
 
     private static void persistKeyPair(final BufferedWriter s, final BigInteger e, final BigInteger n) throws IOException {
@@ -122,6 +134,19 @@ public class Rsa {
 
     public static BigInteger[] loadPrivatePair(final BufferedReader br) throws IOException {
         return loadKeyPair(br);
+    }
+
+    public static BigInteger[] generatePQ(final int keyLength) {
+        BigInteger[] res = new BigInteger[2];
+        BigInteger p, q;
+        do {
+          p = Rsa.generateRandomPrime(keyLength / 2);
+          q = Rsa.generateRandomPrime(keyLength / 2);
+          //System.out.println(p + " " + q + " bl: " + p.multiply(q).bitLength());
+      } while (p.multiply(q).bitLength() != keyLength || p.equals(q));
+        res[0] = p;
+        res[1] = q;
+        return res;
     }
 
 }
