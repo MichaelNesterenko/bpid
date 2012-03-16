@@ -3,12 +3,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>mishanesterenko.bpid</groupId>
 	<artifactId>parent</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>${project.version}</version>
 	<packaging>pom</packaging>
 
 	<modules>
 		<module>des</module>
 		<module>rsa</module>
+		<module>diffie_helman</module>
 	</modules>
 
 	<dependencyManagement>
@@ -19,11 +20,18 @@
 				<version>4.10</version>
 				<scope>test</scope>
 			</dependency>
+			<dependency>
+				<groupId>mishanesterenko.bpid</groupId>
+				<artifactId>rsa</artifactId>
+				<version>${project.version}</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
+
 	<properties>
 		<compiler.version>2.3.2</compiler.version>
 		<java.version>1.7</java.version>
+		<project.version>0.0.1-SNAPSHOT</project.version>
 	</properties>
 
 	<build>
