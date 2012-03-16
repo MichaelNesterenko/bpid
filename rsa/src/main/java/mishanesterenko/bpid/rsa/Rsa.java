@@ -45,14 +45,6 @@ public class Rsa {
         BigInteger phi = p.subtract(BigInteger.ONE).multiply(q.subtract(BigInteger.ONE));
         BigInteger res = e.modInverse(phi);
         return res;
-//        for (long k = 1; k < Long.MAX_VALUE; ++k) {
-//            BigInteger up = BigInteger.ONE.add(BigInteger.valueOf(k).multiply(phi));
-//            BigInteger rem = up.mod(e);
-//            if (rem.equals(BigInteger.ZERO)) {
-//                return up.divide(e);
-//            }
-//        }
-//        throw new IllegalStateException("Can not create private key.");
     }
 
     private static void mayRsaWork(final byte[] data, final BigInteger n) {
